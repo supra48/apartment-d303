@@ -1,0 +1,110 @@
+:root {
+  --paper: #f3f0e8;
+  --ink: #1c1c1a;
+  --ink-2: #57534b;
+  --line: rgba(28, 28, 26, .16);
+  --glass: rgba(243, 240, 232, .86);
+  --font: "Helvetica Neue", "Segoe UI", Arial, system-ui, sans-serif;
+}
+* { box-sizing: border-box; }
+html, body {
+  margin: 0; height: 100%; overflow: hidden; background: var(--paper);
+  font-family: var(--font); color: var(--ink);
+  -webkit-user-select: none; user-select: none; -webkit-tap-highlight-color: transparent;
+}
+#scene { position: fixed; inset: 0; width: 100vw; height: 100vh; display: block; touch-action: none; outline: none; }
+[hidden] { display: none !important; }
+
+button {
+  font: inherit; color: var(--ink); background: var(--glass); border: 1px solid var(--line);
+  border-radius: 999px; padding: 10px 16px; font-size: 14px; letter-spacing: .02em; cursor: pointer;
+  -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px);
+}
+button:hover { border-color: rgba(28, 28, 26, .45); }
+button.primary { background: var(--ink); color: var(--paper); border-color: var(--ink); padding: 14px 26px; font-size: 16px; }
+
+/* loader */
+#loader { position: fixed; inset: 0; display: grid; place-content: center; gap: 18px; background: var(--paper); z-index: 50; transition: opacity .5s; }
+#loader.done { opacity: 0; pointer-events: none; }
+.ld-title { font-size: 34px; font-weight: 600; letter-spacing: .08em; text-align: center; }
+.ld-bar { width: 180px; height: 2px; background: var(--line); }
+.ld-bar i { display: block; height: 100%; width: 0; background: var(--ink); transition: width .2s; }
+
+/* title block, like the corner of a drawing sheet */
+#title { max-width: 260px;
+  position: fixed; top: max(14px, env(safe-area-inset-top)); left: 16px; z-index: 10; pointer-events: none;
+  padding: 10px 14px; border: 1px solid var(--ink); background: var(--glass);
+  -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px); transition: opacity .6s;
+}
+#title .t1 { font-size: 15px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; }
+#title .t2 { font-size: 11.5px; color: var(--ink-2); margin-top: 3px; letter-spacing: .03em; }
+body.walking #title { opacity: 0; }
+
+#plan-ui {
+  position: fixed; left: 0; right: 0; bottom: max(22px, env(safe-area-inset-bottom)); z-index: 10;
+  display: flex; flex-direction: column; align-items: center; gap: 10px; transition: opacity .5s;
+}
+#plan-ui .hint { font-size: 12px; color: var(--ink-2); letter-spacing: .03em; background: var(--glass); padding: 4px 10px; border-radius: 999px; }
+#plan-ui.gone { opacity: 0; pointer-events: none; }
+
+/* walk HUD */
+#room {
+  position: fixed; top: max(14px, env(safe-area-inset-top)); left: 50%; transform: translateX(-50%); z-index: 10;
+  padding: 7px 16px; border-radius: 999px; background: var(--glass); border: 1px solid var(--line);
+  font-size: 13px; font-weight: 600; letter-spacing: .1em; text-transform: uppercase; pointer-events: none;
+  transition: transform .35s, font-size .35s;
+  -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px);
+}
+#room.big { transform: translateX(-50%) scale(1.25); }
+#room:empty { display: none; }
+
+#minimap {
+  position: fixed; top: max(14px, env(safe-area-inset-top)); right: 14px; z-index: 10;
+  border: 1px solid var(--line); border-radius: 10px; background: var(--glass); cursor: crosshair; touch-action: none;
+  -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px);
+}
+
+#bar {
+  position: fixed; left: 50%; transform: translateX(-50%); bottom: max(16px, env(safe-area-inset-bottom)); z-index: 10;
+  display: flex; gap: 6px; padding: 6px; border-radius: 999px; background: rgba(243, 240, 232, .55);
+  -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px); border: 1px solid var(--line);
+}
+#bar button { padding: 9px 14px; background: transparent; border-color: transparent; }
+#bar button.on { background: var(--ink); color: var(--paper); }
+
+#help {
+  position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(max(16px, env(safe-area-inset-bottom)) + 62px); z-index: 10;
+  font-size: 12.5px; color: var(--ink); background: var(--glass); border: 1px solid var(--line); border-radius: 12px;
+  padding: 8px 14px; text-align: center; max-width: min(92vw, 520px); line-height: 1.5; pointer-events: none; transition: opacity .8s;
+}
+#help.gone { opacity: 0; }
+
+#joy { position: fixed; width: 112px; height: 112px; margin: -56px 0 0 -56px; border-radius: 50%; border: 1.5px solid rgba(28, 28, 26, .35); background: rgba(243, 240, 232, .25); pointer-events: none; z-index: 9; opacity: 0; transition: opacity .15s; }
+#joy.on { opacity: 1; }
+#joy i { position: absolute; left: 50%; top: 50%; width: 44px; height: 44px; margin: -22px 0 0 -22px; border-radius: 50%; background: rgba(28, 28, 26, .55); }
+
+/* room list */
+#sheet { position: fixed; inset: 0; z-index: 20; background: rgba(28, 28, 26, .22); display: flex; align-items: flex-end; justify-content: center; }
+.sheet-inner { width: min(560px, 100vw); max-height: 75vh; overflow: auto; background: var(--paper); border-radius: 18px 18px 0 0; padding: 16px 16px calc(16px + env(safe-area-inset-bottom)); }
+.sheet-title { font-size: 12px; letter-spacing: .14em; text-transform: uppercase; color: var(--ink-2); margin: 2px 4px 12px; }
+#room-list { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+#room-list button { border-radius: 12px; text-align: left; padding: 12px 14px; background: #fff; }
+
+#fade { position: fixed; inset: 0; background: var(--paper); opacity: 0; pointer-events: none; z-index: 15; transition: opacity .22s; }
+#fade.on { opacity: 1; }
+
+#nogl { position: fixed; inset: 0; display: grid; place-content: center; text-align: center; padding: 24px; background: var(--paper); z-index: 60; }
+
+@media (max-width: 520px) {
+  #title { left: 10px; padding: 8px 10px; }
+  #title .t1 { font-size: 13px; }
+  #title .t2 { font-size: 10.5px; max-width: 62vw; }
+  #bar button { padding: 9px 11px; font-size: 13px; }
+}
+#help:empty { display: none; }
+#bar button { white-space: nowrap; }
+@media (max-width: 520px) {
+  #room { left: 12px; transform: none; transform-origin: left center; max-width: calc(100vw - 140px); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 12px; }
+  #room.big { transform: scale(1.12); }
+  #bar { gap: 2px; padding: 5px; }
+}

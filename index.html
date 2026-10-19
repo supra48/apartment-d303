@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="robots" content="noindex,nofollow">
+<meta name="theme-color" content="#f3f0e8">
+<title>Apartment Δ303 · walk-through</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<canvas id="scene"></canvas>
+
+<div id="loader"><div class="ld-title">Δ303</div><div class="ld-bar"><i></i></div></div>
+
+<header id="title">
+  <div class="t1">Apartment Δ303</div>
+  <div class="t2">Level +10.65 · 3 bedrooms · 2 bathrooms · covered veranda</div>
+</header>
+
+<div id="plan-ui">
+  <button id="enter" class="primary">Walk through it</button>
+  <div class="hint">This drawing is the 3D model, seen from straight above</div>
+</div>
+
+<div id="walk-ui" hidden>
+  <div id="room"></div>
+  <canvas id="minimap" aria-label="Map: tap to go there"></canvas>
+  <nav id="bar">
+    <button data-act="rooms">Rooms</button>
+    <button data-act="tour">Tour</button>
+    <button data-act="overview">3D view</button>
+    <button data-act="plan">Plan</button>
+  </nav>
+  <div id="help"></div>
+  <div id="joy"><i></i></div>
+</div>
+
+<div id="sheet" hidden>
+  <div class="sheet-inner">
+    <div class="sheet-title">Go to</div>
+    <div id="room-list"></div>
+  </div>
+</div>
+
+<div id="fade"></div>
+
+<div id="nogl" hidden>
+  <p>This page needs WebGL to draw the apartment in 3D.<br>Please open it in an up-to-date Chrome, Safari or Firefox.</p>
+</div>
+
+<script type="importmap">{ "imports": { "three": "./vendor/three.module.js" } }</script>
+<script type="module" src="app.js"></script>
+</body>
+</html>
