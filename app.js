@@ -695,7 +695,6 @@ function inkLine(points, m = inkMat) {
 function buildAnnotations() {
   label('BEDROOM 2', '3.00 × 3.00', 215, 893, 0.85);
   label('BEDROOM 3', '3.60 × 3.00', 240, 975, 0.85);
-  label('BEDROOM 1', '3.07 × 4.00', 690, 955, 0.85);
   label('SHOWER', '1.80 × 2.10', 452, 800, 0.52);
   label('HALL', '', 435, 1100, 0.45);
   label('KITCHEN', '', 190, 1296, 0.85);
@@ -739,6 +738,7 @@ const SUITE = {
     vanity(690, 1148, 738, 1182, [698, 1154, 730, 1176]);
     F(692, 1178, 736, 1180, 1.1, 1.9, M.mirror, {});
     label('EN-SUITE', '1.50 × 2.00', 722, 1120, 0.48);
+    label('BEDROOM 1', '3.07 × 4.00', 690, 955, 0.85);
     label('WARDROBE', '', 581, 1095, 0.48);
   },
   B() {
@@ -763,6 +763,8 @@ const SUITE = {
     box(G.furniture, X(775), Z(1124), X(804), Z(1126), 2.12, 2.14, M.metal, { cast: false });
     Fc(775, 1125, 0.11, 2.08, 2.1, M.metal, {});
     label('EN-SUITE', '2.07 × 1.60', 688, 1095, 0.45);
+    // the wardrobe now stands 3.76 m from the window wall (north wall face 668 px to wardrobe front 988 px)
+    label('BEDROOM 1', '3.07 × 3.76', 690, 945, 0.85);
     label('WARDROBE', '', 581, 1090, 0.48);
   },
 };
