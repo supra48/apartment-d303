@@ -284,7 +284,7 @@ const WALLS_V = {
   // as drawn: en-suite in the corner, wardrobes both sides of the aisle
   A: [['v', 680, 1007, 1190, 10, []], ['h', 1012, 675, 807, 10, [door(692, 770)]], ['v', 821, 1030, 1140, 28, [win(1040, 1095, 1.5)]]],
   // the sketch: the en-suite wall moves to the aisle, a wardrobe faces the bed, the small window drops into the bathroom
-  B: [['v', 626, 1007, 1190, 10, [door(1078, 1146)]], ['h', 1070, 631, 807, 10, []], ['v', 821, 1030, 1140, 28, [win(1076, 1119, 1.5)]]],
+  B: [['v', 626, 988, 1190, 10, [door(1053, 1121)]], ['h', 1044, 631, 807, 10, []], ['v', 821, 1030, 1140, 28, [win(1052, 1107, 1.5)]]],
 };
 function buildWalls(list = WALLS) {
   for (const [o, at, from, to, t, ops] of list) {
@@ -743,26 +743,26 @@ const SUITE = {
   },
   B() {
     buildWalls(WALLS_V.B);
-    doorLeaf(626, 1081, 65, 90, 0);
-    plane(631, 1075, 807, 1185, -0.001, M.bathFloor, { tile: 0.6 });
-    ceilingLight(700, 1125);
-    // wardrobe across the old corner, doors facing the bed
-    wardrobeN(631, 1009, 805, 1063, M.lacquer);
+    doorLeaf(626, 1056, 65, 90, 0);
+    plane(631, 1049, 807, 1185, -0.001, M.bathFloor, { tile: 0.6 });
+    ceilingLight(700, 1110);
+    // wardrobe across the old corner, 0.60 m deep, doors facing the bed
+    wardrobeN(631, 988, 805, 1037, M.lacquer);
     // chest of drawers closing the end of the aisle
     F(541, 1149, 620, 1185, 0, 0.88, M.lacquer, { block: true });
     F(540, 1147, 621, 1185, 0.88, 0.92, M.walnut, {});
     for (const y of [0.3, 0.6]) box(G.furniture, X(541), Z(1149) - 0.006, X(620), Z(1149) + 0.002, y - 0.004, y + 0.004, M.black, { cast: false });
     // en-suite: basin, WC, shower behind glass
-    tileWall(631, 1075, 804, 1078); tileWall(631, 1146, 634, 1182); tileWall(631, 1182, 807, 1185);
-    tileWall(804, 1078, 807, 1119, 1.47); tileWall(804, 1119, 807, 1182);
+    tileWall(631, 1049, 804, 1052); tileWall(631, 1121, 634, 1182); tileWall(631, 1182, 807, 1185);
+    tileWall(804, 1052, 807, 1107, 1.47); tileWall(804, 1107, 807, 1182);
     vanity(643, 1150, 685, 1182, [649, 1155, 679, 1177]);
     F(646, 1178, 682, 1180, 1.1, 1.9, M.mirror, {});
     wc(718, 1151, 's');
-    F(742, 1078, 804, 1182, 0, 0.04, M.ceramic, { cast: false });
-    glassPanel(741, 1128, 743, 1182);
-    box(G.furniture, X(774), Z(1150), X(776), Z(1182), 2.12, 2.14, M.metal, { cast: false });
-    Fc(775, 1150, 0.11, 2.08, 2.1, M.metal, {});
-    label('EN-SUITE', '2.08 × 1.29', 688, 1112, 0.45);
+    F(742, 1052, 804, 1182, 0, 0.04, M.ceramic, { cast: false });
+    glassPanel(741, 1110, 743, 1182);
+    box(G.furniture, X(775), Z(1124), X(804), Z(1126), 2.12, 2.14, M.metal, { cast: false });
+    Fc(775, 1125, 0.11, 2.08, 2.1, M.metal, {});
+    label('EN-SUITE', '2.07 × 1.60', 688, 1095, 0.45);
     label('WARDROBE', '', 581, 1090, 0.48);
   },
 };
@@ -962,9 +962,9 @@ const VIEWS = [
   { name: 'Shower room', p: [435, 874], t: [482, 705] },
   { name: 'Bedroom 2', p: [358, 878], t: [95, 770] },
   { name: 'Bedroom 3', p: [358, 982], t: [115, 1115] },
-  { name: 'Master bedroom', p: [720, 975], t: [705, 720] },
+  { name: 'Master bedroom', p: [720, 955], t: [705, 720] },
   { name: 'Walk-in wardrobe', p: [585, 968], t: [581, 1190] },
-  { name: 'En-suite', p: [735, 1040], t: [745, 1185], B: { p: [590, 1112], t: [800, 1160] } },
+  { name: 'En-suite', p: [735, 1040], t: [745, 1185], B: { p: [590, 1088], t: [800, 1150] } },
 ];
 function viewPose(v) {
   const s = v[layout] || v;
@@ -980,7 +980,7 @@ const ROOMS = [
 ];
 const V_ROOMS = {
   A: [['En-suite', 685, 1017, 807, 1185], ['Walk-in wardrobe', 487, 1012, 675, 1190]],
-  B: [['En-suite', 631, 1075, 807, 1185], ['Walk-in wardrobe', 487, 1008, 621, 1190]],
+  B: [['En-suite', 631, 1049, 807, 1185], ['Walk-in wardrobe', 487, 1008, 621, 1190]],
 };
 function roomAt(x, z) {
   const px = x * S + OX, py = z * S + OY;
