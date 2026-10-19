@@ -168,12 +168,25 @@ const G = {
 };
 Object.values(G).forEach(g => scene.add(g));
 
+/* two layouts of the master suite (as drawn, and the owner's sketch), switchable while walking */
+let layout = 'A';
+let BUILD = null;  // the layout being built right now; null = shared by both
+const VAR = {};
+for (const k of ['A', 'B']) {
+  VAR[k] = { group: new THREE.Group(), labels: new THREE.Group(), obs: [], map: [], caps: [] };
+  scene.add(VAR[k].group);
+  G.labels.add(VAR[k].labels);
+}
+const tgt = parent => (BUILD && (parent === G.building || parent === G.furniture || parent === G.ink) ? VAR[BUILD].group : parent);
+const mapPush = r => (BUILD ? VAR[BUILD].map : mapRects).push(r);
+
 const obstacles = [];  // xz boxes the walker cannot enter
 const mapRects = [];   // for the mini map
 const inkLines = [];
 const floors = [];
 const labelMats = [];
 const capRects = [];
+const plantCrowns = [];
 
 /* ---------------- geometry helpers ---------------- */
 function boxGeo(w, h, d, tile) {
@@ -189,9 +202,10 @@ function boxGeo(w, h, d, tile) {
   return g;
 }
 function block(x1, z1, x2, z2) {
-  obstacles.push({ x1: Math.min(x1, x2), z1: Math.min(z1, z2), x2: Math.max(x1, x2), z2: Math.max(z1, z2) });
+  (BUILD ? VAR[BUILD].obs : obstacles).push({ x1: Math.min(x1, x2), z1: Math.min(z1, z2), x2: Math.max(x1, x2), z2: Math.max(z1, z2) });
 }
 function box(parent, x1, z1, x2, z2, y1, y2, m, o = {}) {
+  parent = tgt(parent);
   const w = Math.abs(x2 - x1), d = Math.abs(z2 - z1), h = y2 - y1;
   const g = boxGeo(w, h, d, o.tile);
   const mesh = new THREE.Mesh(g, m);
@@ -210,6 +224,7 @@ const F = (px1, py1, px2, py2, y1, y2, m, o = {}) =>
   box(G.furniture, X(px1), Z(py1), X(px2), Z(py2), y1, y2, m, { edges: true, ...o });
 
 function cyl(parent, x, z, r, y1, y2, m, o = {}) {
+  parent = tgt(parent);
   const g = new THREE.CylinderGeometry(o.r2 ?? r, r, y2 - y1, o.seg || 28);
   const mesh = new THREE.Mesh(g, m);
   mesh.position.set(x, (y1 + y2) / 2, z);
@@ -237,7 +252,7 @@ function plane(px1, py1, px2, py2, y, m, { tile = 0, down = false, parent = G.bu
   p.position.set(X((px1 + px2) / 2), y, Z((py1 + py2) / 2));
   p.receiveShadow = !down;
   p.castShadow = down;
-  parent.add(p);
+  tgt(parent).add(p);
   if (!down && isFloor) floors.push(p);
   return p;
 }
@@ -253,7 +268,8 @@ const WALLS = [
   ['h', 654, 40, 835, 28, [win(128.6, 264.9), win(472.8, 523.9, 1.5), win(608.3, 744.6)]],   // north: 1.04 | 1.60 | 2.44 | .60 | .99 | 1.60 | 1.07
   ['h', 1676, 40, 835, 28, [slide(148, 428), slide(530, 785)]],                              // south: glass to the veranda
   ['v', 54, 668, 1662, 28, [win(985, 1120), win(1245, 1335, 1.0), win(1560, 1640)]],         // west
-  ['v', 821, 668, 1662, 28, [win(770, 960), win(1040, 1095, 1.5), door(1238, 1323, 2.15)]],  // east + front door
+  ['v', 821, 668, 1030, 28, [win(770, 960)]],                                               // east
+  ['v', 821, 1140, 1662, 28, [door(1238, 1323, 2.15)]],                                      // east + front door
   ['h', 1190, 68, 807, 10, [passage(385, 482)]],   // bedrooms | living
   ['h', 928, 68, 383, 10, []],                     // bedroom 2 | bedroom 3
   ['v', 388, 668, 1190, 10, [door(840, 913), door(943, 1015)]],
@@ -261,13 +277,17 @@ const WALLS = [
   ['v', 548, 668, 925, 10, []],
   ['h', 920, 477, 553, 10, []],                    // laundry niche
   ['v', 482, 915, 1190, 10, [door(925, 1003)]],    // master bedroom door
-  ['v', 680, 1007, 1190, 10, []],                  // en-suite
-  ['h', 1012, 675, 807, 10, [door(692, 770)]],
   ['v', 821, 1690, PY_VER, 28, []],                // veranda side wall
 ];
 
-function buildWalls() {
-  for (const [o, at, from, to, t, ops] of WALLS) {
+const WALLS_V = {
+  // as drawn: en-suite in the corner, wardrobes both sides of the aisle
+  A: [['v', 680, 1007, 1190, 10, []], ['h', 1012, 675, 807, 10, [door(692, 770)]], ['v', 821, 1030, 1140, 28, [win(1040, 1095, 1.5)]]],
+  // the sketch: the en-suite wall moves to the aisle, a wardrobe faces the bed, the small window drops into the bathroom
+  B: [['v', 626, 1007, 1190, 10, [door(1078, 1146)]], ['h', 1070, 631, 807, 10, []], ['v', 821, 1030, 1140, 28, [win(1076, 1119, 1.5)]]],
+};
+function buildWalls(list = WALLS) {
+  for (const [o, at, from, to, t, ops] of list) {
     let cur = from;
     const pieces = [];
     for (const op of [...ops].sort((p, q) => p.a - q.a)) {
@@ -290,9 +310,9 @@ function wallPiece(o, at, t, s) {
 
   if (s.kind === 'solid') {
     sb(A, B, T, 0, H, M.wall);
-    capRects.push(rect(A, B));
+    (BUILD ? VAR[BUILD].caps : capRects).push(rect(A, B));
     block(...rect(A, B));
-    mapRects.push({ r: rect(A, B), k: 'wall' });
+    mapPush({ r: rect(A, B), k: 'wall' });
     return;
   }
   if (s.head < H) sb(A, B, T, s.head, H, M.wall);
@@ -306,7 +326,7 @@ function wallPiece(o, at, t, s) {
     if (B - A > 1.1) sb((A + B) / 2 - 0.025, (A + B) / 2 + 0.025, d, s.sill, s.head - f, M.frame, op);
     sb(A + f, B - f, 0.012, s.sill, s.head - f, M.glass, { cast: false });
     block(...rect(A, B));
-    mapRects.push({ r: rect(A, B), k: 'win' });
+    mapPush({ r: rect(A, B), k: 'win' });
   } else if (s.kind === 'slide') {
     const mid = (A + B) / 2, op = { cast: false, edges: true }, hd = s.head;
     sb(A, B, 0.1, 0, 0.02, M.frame, op);
@@ -324,9 +344,9 @@ function wallPiece(o, at, t, s) {
     leaf(A + 0.04, mid + 0.03, -0.028);
     leaf(A + 0.1, mid + 0.09, 0.028);       // sliding leaf, pushed open over the fixed one
     block(...rect(A, mid + 0.1));
-    mapRects.push({ r: rect(A, B), k: 'win' });
+    mapPush({ r: rect(A, B), k: 'win' });
   } else {
-    mapRects.push({ r: rect(A, B), k: 'door' });
+    mapPush({ r: rect(A, B), k: 'door' });
   }
 }
 
@@ -337,11 +357,13 @@ const DOORS = [
   [388, 943, 72, 90, 180],    // bedroom 3
   [398, 850, 74, 0, 270],     // shower room
   [482, 1003, 78, 270, 360],  // master bedroom
-  [692, 1012, 78, 0, 90],     // en-suite
   [807, 1323, 85, 270, 180],  // front door
 ];
 function buildDoors() {
-  for (const [hx, hy, r, a0, a1] of DOORS) {
+  for (const d of DOORS) doorLeaf(...d);
+}
+function doorLeaf(hx, hy, r, a0, a1) {
+  {
     const dx = Math.round(Math.cos(a1 * D2R)), dy = Math.round(Math.sin(a1 * D2R));
     const ex = hx + dx * (r - 2), ey = hy + dy * (r - 2), t = 2;
     const x1 = Math.min(hx, ex) - (dx === 0 ? t : 0), x2 = Math.max(hx, ex) + (dx === 0 ? t : 0);
@@ -355,16 +377,15 @@ function buildDoors() {
       pts.push(new THREE.Vector3(X(hx + Math.cos(a) * r), 0.012, Z(hy + Math.sin(a) * r)));
     }
     const arc = new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), inkFaint);
-    G.ink.add(arc);
+    tgt(G.ink).add(arc);
   }
 }
 
 /* ---------------- floors, ceilings, the building around ---------------- */
 function buildShell() {
-  plane(40, 640, 835, 1690, 0, M.oak, { tile: 1.8 });
-  plane(393, 668, 543, 845, 0.003, M.bathFloor, { tile: 0.6 });
-  plane(685, 1017, 807, 1185, 0.003, M.bathFloor, { tile: 0.6 });
-  plane(40, 1690, 835, PY_VER, 0, M.vtile, { tile: 0.6 });
+  plane(40, 640, 835, 1690, -0.002, M.oak, { tile: 1.8 });
+  plane(393, 668, 543, 845, -0.001, M.bathFloor, { tile: 0.6 });
+  plane(40, 1690, 835, PY_VER, -0.002, M.vtile, { tile: 0.6 });
 
   ceiling = plane(68, 668, 807, 1662, H, M.ceil, { down: true });
   plane(40, 1690, 835, PY_VER, H, M.ceil, { down: true });
@@ -414,7 +435,7 @@ function buildShell() {
   groundMesh = ground;
 
   // recessed ceiling lights
-  for (const [px, py] of [[205, 800], [225, 1060], [690, 850], [468, 760], [745, 1100], [435, 960], [435, 1120],
+  for (const [px, py] of [[205, 800], [225, 1060], [690, 850], [468, 760], [435, 960], [435, 1120],
     [580, 1100], [130, 1290], [250, 1290], [560, 1290], [700, 1290], [690, 1450], [690, 1600], [200, 1820], [440, 1820], [680, 1820]]) {
     const d = new THREE.Mesh(new THREE.CircleGeometry(0.065, 20), M.glow);
     d.rotation.x = Math.PI / 2;
@@ -432,6 +453,7 @@ function plant(px, py, s = 1) {
   const crown = plantCrown(0.36 * s, Math.round(px * 7 + py));
   crown.position.set(X(px), 0.98 * s, Z(py));
   G.furniture.add(crown);
+  plantCrowns.push(crown);
 }
 function chair(px, py, face) {
   const cx = X(px), cz = Z(py), s = 0.22;
@@ -448,12 +470,12 @@ function stool(px, py) {
   Fc(px, py, 0.025, 0.02, 0.63, M.metal, { edges: false });
   Fc(px, py, 0.19, 0.63, 0.68, M.walnut, { block: true });
 }
-function bed({ x1, y1, x2, y2, head, duvet, pillows }) {
+function bed({ x1, y1, x2, y2, head, duvet, pillows, headH = 1.08 }) {
   F(x1, y1, x2, y2, 0, 0.3, M.walnut, { block: true, tile: 1 });
   F(x1 + 2, y1 + 2, x2 - 2, y2 - 2, 0.3, 0.52, M.linen, { tile: 0.8 });
   F(duvet[0], duvet[1], duvet[2], duvet[3], 0.5, 0.58, duvet.mat, { tile: 0.8 });
   for (const p of pillows) F(...p, 0.52, 0.65, M.linen, { tile: 0.5 });
-  F(...head, 0, 1.08, M.headboard, { tile: 0.8 });
+  F(...head, 0, headH, M.headboard, { tile: 0.8 });
 }
 function wardrobe(x1, y1, x2, y2, m, face) {
   // face: the side the doors open to (w = west, e = east)
@@ -465,12 +487,22 @@ function wardrobe(x1, y1, x2, y2, m, face) {
     box(G.furniture, fx - 0.004, zz - 0.003, fx + 0.004, zz + 0.003, 0.05, 2.37, M.black, { cast: false });
   }
 }
+function wardrobeN(x1, y1, x2, y2, m) {
+  // doors on the north face
+  F(x1, y1, x2, y2, 0, 2.4, m, { block: true, tile: 1.2 });
+  const n = Math.max(2, Math.round((x2 - x1) / S / 0.5)), fz = Z(y1) - 0.004;
+  for (let i = 1; i < n; i++) {
+    const xx = lerp(X(x1), X(x2), i / n);
+    box(G.furniture, xx - 0.003, fz - 0.004, xx + 0.003, fz + 0.004, 0.05, 2.37, M.black, { cast: false });
+  }
+}
 function wc(cx, cy, tankSide) {
   // tankSide: where the cistern sits relative to the bowl (n, e)
   const x = X(cx), z = Z(cy);
   cyl(G.furniture, x, z, 0.17, 0, 0.4, M.ceramic, { r2: 0.2, block: true });
   cyl(G.furniture, x, z, 0.2, 0.4, 0.43, M.ceramic, {});
   if (tankSide === 'n') box(G.furniture, x - 0.2, z - 0.36, x + 0.2, z - 0.18, 0.4, 0.82, M.ceramic, { edges: true, block: true });
+  else if (tankSide === 's') box(G.furniture, x - 0.2, z + 0.18, x + 0.2, z + 0.36, 0.4, 0.82, M.ceramic, { edges: true, block: true });
   else box(G.furniture, x + 0.18, z - 0.2, x + 0.36, z + 0.2, 0.4, 0.82, M.ceramic, { edges: true, block: true });
 }
 function vanity(x1, y1, x2, y2, basin) {
@@ -508,20 +540,19 @@ function buildFurniture() {
   curtains(69, 970, 75, 985); curtains(69, 1120, 75, 1135);
 
   /* master bedroom */
-  bed({ x1: 648, y1: 755, x2: 770, y2: 915, duvet: Object.assign([646, 800, 772, 917], { mat: M.duvetC }),
-    pillows: [[656, 761, 706, 796], [712, 761, 762, 796]], head: [640, 745, 778, 755] });
-  F(604, 755, 641, 792, 0, 0.5, M.walnut, { block: true });
-  F(777, 755, 806, 792, 0, 0.5, M.walnut, { block: true });
-  Fc(622, 773, 0.06, 0.5, 0.82, M.ceramic, {});
-  Fc(622, 773, 0.12, 0.82, 1.0, M.curtain, { r2: 0.09 });
-  Fc(791, 773, 0.06, 0.5, 0.82, M.ceramic, {});
-  Fc(791, 773, 0.12, 0.82, 1.0, M.curtain, { r2: 0.09 });
-  F(615, 880, 800, 980, 0, 0.012, M.rug, { cast: false, edges: false });
-  curtains(594, 669, 607, 675); curtains(746, 669, 759, 675);
+  // headboard against the north wall, kept below the window sill
+  bed({ x1: 648, y1: 677, x2: 770, y2: 837, duvet: Object.assign([646, 720, 772, 839], { mat: M.duvetC }),
+    pillows: [[656, 682, 706, 716], [712, 682, 762, 716]], head: [640, 669, 778, 677], headH: 0.86 });
+  F(609, 670, 645, 706, 0, 0.5, M.walnut, { block: true });
+  F(773, 670, 806, 706, 0, 0.5, M.walnut, { block: true });
+  Fc(627, 688, 0.06, 0.5, 0.82, M.ceramic, {});
+  Fc(627, 688, 0.12, 0.82, 1.0, M.curtain, { r2: 0.09 });
+  Fc(790, 688, 0.06, 0.5, 0.82, M.ceramic, {});
+  Fc(790, 688, 0.12, 0.82, 1.0, M.curtain, { r2: 0.09 });
+  F(620, 800, 800, 950, 0, 0.012, M.rug, { cast: false, edges: false });
   curtains(801, 755, 806, 769); curtains(801, 961, 806, 975);
-  // walk-in wardrobe: two runs with a 0.97 m aisle
+  // walk-in wardrobe run on the hallway side (both layouts)
   wardrobe(487, 1012, 540, 1170, M.lacquer, 'e');
-  wardrobe(622, 1012, 675, 1170, M.lacquer, 'w');
   // laundry niche off the hallway
   F(490, 858, 543, 914, 0, 0.85, M.lacquer, { block: true });
   F(490, 858, 543, 914, 0.87, 1.72, M.lacquer, {});
@@ -542,16 +573,6 @@ function buildFurniture() {
   F(536, 782, 538, 826, 1.1, 1.9, M.mirror, {});
   Fc(536, 804, 0.012, 0.84, 1.07, M.metal, { edges: false });
 
-  /* en-suite */
-  tileWall(685, 1017, 692, 1020); tileWall(770, 1017, 804, 1020);
-  tileWall(804, 1017, 807, 1040); tileWall(804, 1040, 807, 1095, 1.47); tileWall(804, 1095, 807, 1182);
-  tileWall(685, 1182, 807, 1185); tileWall(685, 1020, 688, 1182);
-  F(740, 1100, 804, 1182, 0, 0.04, M.ceramic, { cast: false });
-  glassPanel(760, 1099, 804, 1101); glassPanel(739, 1101, 741, 1140);
-  Fc(790, 1170, 0.1, 2.05, 2.07, M.metal, {});
-  wc(780, 1055, 'e');
-  vanity(690, 1148, 738, 1182, [698, 1154, 730, 1176]);
-  F(692, 1178, 736, 1180, 1.1, 1.9, M.mirror, {});
 
   /* kitchen */
   F(68, 1195, 310, 1251, 0, 0.86, M.cabinet, { block: true });
@@ -641,7 +662,7 @@ function label(name, sub, px, py, scale = 1) {
   mesh.rotation.x = -Math.PI / 2;
   mesh.position.set(X(px), 0.05, Z(py));
   mesh.renderOrder = 10;
-  G.labels.add(mesh);
+  (BUILD ? VAR[BUILD].labels : G.labels).add(mesh);
   labelMats.push(m);
 }
 function northArrow(px, py) {
@@ -676,9 +697,7 @@ function buildAnnotations() {
   label('BEDROOM 3', '3.60 × 3.00', 240, 975, 0.85);
   label('BEDROOM 1', '3.07 × 4.00', 690, 955, 0.85);
   label('SHOWER', '1.80 × 2.10', 452, 800, 0.52);
-  label('EN-SUITE', '1.50 × 2.00', 722, 1120, 0.48);
   label('HALL', '', 435, 1100, 0.45);
-  label('WARDROBE', '', 581, 1095, 0.48);
   label('KITCHEN', '', 190, 1296, 0.85);
   label('DINING', '', 265, 1462, 0.85);
   label('LIVING ROOM', '8.67 × 5.54', 705, 1585, 0.95);
@@ -697,24 +716,78 @@ function buildAnnotations() {
 }
 
 /* ---------------- build ---------------- */
+function ceilingLight(px, py) {
+  const d = new THREE.Mesh(new THREE.CircleGeometry(0.065, 20), M.glow);
+  d.rotation.x = Math.PI / 2;
+  d.position.set(X(px), H - 0.004, Z(py));
+  tgt(G.building).add(d);
+}
+const SUITE = {
+  A() {
+    buildWalls(WALLS_V.A);
+    doorLeaf(692, 1012, 78, 0, 90);
+    plane(685, 1017, 807, 1185, -0.001, M.bathFloor, { tile: 0.6 });
+    ceilingLight(745, 1100);
+    wardrobe(622, 1012, 675, 1170, M.lacquer, 'w');
+    tileWall(685, 1017, 692, 1020); tileWall(770, 1017, 804, 1020);
+    tileWall(804, 1017, 807, 1040); tileWall(804, 1040, 807, 1095, 1.47); tileWall(804, 1095, 807, 1182);
+    tileWall(685, 1182, 807, 1185); tileWall(685, 1020, 688, 1182);
+    F(740, 1100, 804, 1182, 0, 0.04, M.ceramic, { cast: false });
+    glassPanel(760, 1099, 804, 1101); glassPanel(739, 1101, 741, 1140);
+    Fc(790, 1170, 0.1, 2.05, 2.07, M.metal, {});
+    wc(780, 1055, 'e');
+    vanity(690, 1148, 738, 1182, [698, 1154, 730, 1176]);
+    F(692, 1178, 736, 1180, 1.1, 1.9, M.mirror, {});
+    label('EN-SUITE', '1.50 × 2.00', 722, 1120, 0.48);
+    label('WARDROBE', '', 581, 1095, 0.48);
+  },
+  B() {
+    buildWalls(WALLS_V.B);
+    doorLeaf(626, 1081, 65, 90, 0);
+    plane(631, 1075, 807, 1185, -0.001, M.bathFloor, { tile: 0.6 });
+    ceilingLight(700, 1125);
+    // wardrobe across the old corner, doors facing the bed
+    wardrobeN(631, 1009, 805, 1063, M.lacquer);
+    // chest of drawers closing the end of the aisle
+    F(541, 1149, 620, 1185, 0, 0.88, M.lacquer, { block: true });
+    F(540, 1147, 621, 1185, 0.88, 0.92, M.walnut, {});
+    for (const y of [0.3, 0.6]) box(G.furniture, X(541), Z(1149) - 0.006, X(620), Z(1149) + 0.002, y - 0.004, y + 0.004, M.black, { cast: false });
+    // en-suite: basin, WC, shower behind glass
+    tileWall(631, 1075, 804, 1078); tileWall(631, 1146, 634, 1182); tileWall(631, 1182, 807, 1185);
+    tileWall(804, 1078, 807, 1119, 1.47); tileWall(804, 1119, 807, 1182);
+    vanity(643, 1150, 685, 1182, [649, 1155, 679, 1177]);
+    F(646, 1178, 682, 1180, 1.1, 1.9, M.mirror, {});
+    wc(718, 1151, 's');
+    F(742, 1078, 804, 1182, 0, 0.04, M.ceramic, { cast: false });
+    glassPanel(741, 1128, 743, 1182);
+    box(G.furniture, X(774), Z(1150), X(776), Z(1182), 2.12, 2.14, M.metal, { cast: false });
+    Fc(775, 1150, 0.11, 2.08, 2.1, M.metal, {});
+    label('EN-SUITE', '2.08 × 1.29', 688, 1112, 0.45);
+    label('WARDROBE', '', 581, 1090, 0.48);
+  },
+};
+
 buildWalls();
 buildDoors();
 buildShell();
 buildFurniture();
 buildAnnotations();
+for (const k of ['A', 'B']) { BUILD = k; SUITE[k](); }
+BUILD = null;
 
 /* section caps: the solid poché you see where the plane cuts the walls */
 const capMat = new THREE.MeshBasicMaterial({ color: INK.clone(), side: THREE.DoubleSide, fog: false });
-const caps = (() => {
+function makeCaps(rects, parent) {
   const pos = [];
-  for (const [x1, z1, x2, z2] of capRects) pos.push(x1, 0, z1, x2, 0, z1, x2, 0, z2, x1, 0, z1, x2, 0, z2, x1, 0, z2);
+  for (const [x1, z1, x2, z2] of rects) pos.push(x1, 0, z1, x2, 0, z1, x2, 0, z2, x1, 0, z1, x2, 0, z2, x1, 0, z2);
   const g = new THREE.BufferGeometry();
   g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
   const m = new THREE.Mesh(g, capMat);
   m.frustumCulled = false;
-  scene.add(m);
+  parent.add(m);
   return m;
-})();
+}
+const allCaps = [makeCaps(capRects, scene), makeCaps(VAR.A.caps, VAR.A.group), makeCaps(VAR.B.caps, VAR.B.group)];
 
 /* the real street outside (OpenStreetMap), see city.js */
 const G_CTX = new THREE.Group();
@@ -752,8 +825,10 @@ function setBuild(b) {
     p.color.copy(p.userData.base).multiplyScalar(m);
     p.envMapIntensity = m;
   }
-  caps.visible = cut.constant < H - 0.002;
-  caps.position.y = Math.min(cut.constant, H) - 0.004;
+  for (const c of allCaps) {
+    c.visible = cut.constant < H - 0.002;
+    c.position.y = Math.min(cut.constant, H) - 0.004;
+  }
   capMat.color.copy(INK).lerp(PLASTER, Math.max(m, seg(cut.constant, H - 0.6, H)));
   inkMat.opacity = 1 - m;
   inkFaint.opacity = 0.35 * (1 - m);
@@ -768,6 +843,7 @@ function setBuild(b) {
   groundMesh.visible = m > 0.005;
   G.site.visible = b > 0.04;
   G_CTX.visible = m > 0.3;
+  for (const c of plantCrowns) c.visible = m > 0.25;
   ceiling.castShadow = cut.constant > H;
 }
 
@@ -886,23 +962,29 @@ const VIEWS = [
   { name: 'Shower room', p: [435, 874], t: [482, 705] },
   { name: 'Bedroom 2', p: [358, 878], t: [95, 770] },
   { name: 'Bedroom 3', p: [358, 982], t: [115, 1115] },
-  { name: 'Master bedroom', p: [785, 985], t: [600, 760] },
+  { name: 'Master bedroom', p: [720, 975], t: [705, 720] },
   { name: 'Walk-in wardrobe', p: [585, 968], t: [581, 1190] },
-  { name: 'En-suite', p: [735, 1040], t: [745, 1185] },
+  { name: 'En-suite', p: [735, 1040], t: [745, 1185], B: { p: [590, 1112], t: [800, 1160] } },
 ];
 function viewPose(v) {
-  const pos = new THREE.Vector3(X(v.p[0]), EYE, Z(v.p[1]));
-  const a = lookAngles(pos, new THREE.Vector3(X(v.t[0]), 1.3, Z(v.t[1])));
+  const s = v[layout] || v;
+  const pos = new THREE.Vector3(X(s.p[0]), EYE, Z(s.p[1]));
+  const a = lookAngles(pos, new THREE.Vector3(X(s.t[0]), 1.3, Z(s.t[1])));
   return { pos, yaw: a.yaw, pitch: a.pitch, fov: walkFov() };
 }
 const ROOMS = [
-  ['Shower room', 393, 668, 543, 845], ['En-suite', 685, 1017, 807, 1185], ['Walk-in wardrobe', 487, 1012, 675, 1190],
+  ['Shower room', 393, 668, 543, 845],
   ['Hallway', 393, 845, 543, 920], ['Hallway', 393, 920, 477, 1196], ['Master bedroom', 487, 668, 807, 1012],
   ['Bedroom 2', 68, 668, 383, 928], ['Bedroom 3', 68, 928, 383, 1190], ['Kitchen', 68, 1190, 420, 1440],
   ['Dining', 68, 1440, 440, 1662], ['Living room', 420, 1190, 807, 1662], ['Covered veranda', 40, 1662, 835, PY_VER],
 ];
+const V_ROOMS = {
+  A: [['En-suite', 685, 1017, 807, 1185], ['Walk-in wardrobe', 487, 1012, 675, 1190]],
+  B: [['En-suite', 631, 1075, 807, 1185], ['Walk-in wardrobe', 487, 1008, 621, 1190]],
+};
 function roomAt(x, z) {
   const px = x * S + OX, py = z * S + OY;
+  for (const [n, a, b, c, d] of V_ROOMS[layout]) if (px >= a && px <= c && py >= b && py <= d) return n;
   for (const [n, a, b, c, d] of ROOMS) if (px >= a && px <= c && py >= b && py <= d) return n;
   return '';
 }
@@ -911,6 +993,7 @@ function roomAt(x, z) {
 const R = 0.2;
 function free(x, z, r = R) {
   for (const o of obstacles) if (x > o.x1 - r && x < o.x2 + r && z > o.z1 - r && z < o.z2 + r) return false;
+  for (const o of VAR[layout].obs) if (x > o.x1 - r && x < o.x2 + r && z > o.z1 - r && z < o.z2 + r) return false;
   return true;
 }
 function pathClear(x1, z1, x2, z2) {
@@ -928,6 +1011,7 @@ function move(vx, vz) {
 const $ = id => document.getElementById(id);
 const ui = { plan: $('plan-ui'), walk: $('walk-ui'), room: $('room'), help: $('help'), joy: $('joy'), sheet: $('sheet'), map: $('minimap') };
 let mode = 'plan';
+let lastRoom = '';
 let orbit = { yaw: 0.6, pitch: -0.95, dist: 18 };
 let lastWalk = null;
 
@@ -955,7 +1039,7 @@ function showHelp() {
   helpShown = true;
   ui.help.innerHTML = coarse
     ? 'Left thumb: walk · Right thumb: look around<br>Tap the floor to walk there · Tap the map to jump'
-    : 'W A S D or arrow keys: walk · Drag: look around<br>Click the floor to walk there · Shift: faster';
+    : 'W A S D or arrow keys: walk · Drag: look around<br>Click the floor to walk there · Shift: faster · L: switch the master suite';
   setTimeout(() => ui.help.classList.add('gone'), 9000);
 }
 
@@ -1065,6 +1149,7 @@ const keys = {};
 addEventListener('keydown', e => {
   if (e.target.tagName === 'BUTTON' && (e.code === 'Enter' || e.code === 'Space')) return;
   if (mode === 'plan' && (e.code === 'Enter' || e.code === 'Space')) { enter(); return; }
+  if (e.code === 'KeyL') { setLayout(layout === 'A' ? 'B' : 'A'); return; }
   if (mode === 'tour') stopTour();
   keys[e.code] = true;
   if (e.code.startsWith('Arrow') || e.code === 'Space') e.preventDefault();
@@ -1181,19 +1266,47 @@ map.width = MAP_W * mdpr; map.height = MAP_H * mdpr;
 map.style.width = MAP_W + 'px'; map.style.height = MAP_H + 'px';
 const mapBase = document.createElement('canvas');
 mapBase.width = map.width; mapBase.height = map.height;
-{
+function drawMapBase() {
   const g = mapBase.getContext('2d');
+  g.setTransform(1, 0, 0, 1, 0, 0);
+  g.clearRect(0, 0, mapBase.width, mapBase.height);
   g.scale(mdpr, mdpr);
   const r = ([x1, z1, x2, z2]) => [MPAD + x1 * MK, MPAD + z1 * MK, (x2 - x1) * MK, (z2 - z1) * MK];
   g.fillStyle = '#fbfaf6'; g.fillRect(...r([0, 0, W_OUT, Z_SOUTH]));
   g.fillStyle = '#ebe6dc'; g.fillRect(...r([0, Z_SOUTH, W_OUT, Z_VER]));
   g.fillStyle = 'rgba(28,28,26,.13)';
-  for (const o of obstacles) g.fillRect(...r([o.x1, o.z1, o.x2, o.z2]));
-  for (const m of mapRects) {
+  for (const o of obstacles.concat(VAR[layout].obs)) g.fillRect(...r([o.x1, o.z1, o.x2, o.z2]));
+  for (const m of mapRects.concat(VAR[layout].map)) {
     g.fillStyle = m.k === 'wall' ? '#1c1c1a' : m.k === 'win' ? '#8fb1bf' : 'rgba(0,0,0,0)';
     g.fillRect(...r(m.r));
   }
 }
+drawMapBase();
+
+/* switching the master-suite layout */
+const layoutEl = document.getElementById('layout');
+function setLayout(k) {
+  layout = k;
+  for (const v of ['A', 'B']) { VAR[v].group.visible = v === k; VAR[v].labels.visible = v === k; }
+  for (const b of layoutEl.querySelectorAll('button')) b.classList.toggle('on', b.dataset.l === k);
+  drawMapBase();
+  // if a wall or a cupboard now stands where you are, step to the nearest free spot
+  if ((mode === 'walk' || mode === 'tour') && !free(cam.pos.x, cam.pos.z)) {
+    let best = null;
+    for (let r = 0.1; r < 2 && !best; r += 0.1) {
+      for (let a = 0; a < Math.PI * 2; a += Math.PI / 12) {
+        const x = cam.pos.x + Math.cos(a) * r, z = cam.pos.z + Math.sin(a) * r;
+        if (free(x, z)) { best = [x, z]; break; }
+      }
+    }
+    if (best) { cam.pos.x = best[0]; cam.pos.z = best[1]; }
+  }
+  lastRoom = '';
+}
+for (const b of layoutEl.querySelectorAll('button')) {
+  b.addEventListener('click', e => { e.stopPropagation(); setLayout(b.dataset.l); });
+}
+setLayout('A');
 function drawMap() {
   mctx.setTransform(1, 0, 0, 1, 0, 0);
   mctx.clearRect(0, 0, map.width, map.height);
@@ -1223,7 +1336,6 @@ map.addEventListener('pointerdown', async e => {
 
 /* ---------------- loop ---------------- */
 let last = performance.now();
-let lastRoom = '';
 function frame(now) {
   const dt = Math.min(0.1, (now - last) / 1000);
   last = now;
@@ -1328,6 +1440,8 @@ window.__fp = {
     cam.pos.set(px, -10.65 + 1.7, pz); cam.yaw = Math.atan2(-dx, -dz); cam.pitch = 0.08; cam.fov = 70;
     mode = 'debug';
   },
+  setLayout: k => setLayout(k),
+  get layout() { return layout; },
   stats: () => ({ calls: renderer.info.render.calls, tris: renderer.info.render.triangles, geos: renderer.info.memory.geometries, tex: renderer.info.memory.textures }),
   pos: () => ({ x: +cam.pos.x.toFixed(2), z: +cam.pos.z.toFixed(2), yaw: +cam.yaw.toFixed(3), room: roomAt(cam.pos.x, cam.pos.z) }),
 };
