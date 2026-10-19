@@ -108,3 +108,5 @@ body.walking #title { opacity: 0; }
   #room.big { transform: scale(1.12); }
   #bar { gap: 2px; padding: 5px; }
 }
+#credit { position: fixed; left: 10px; bottom: 4px; z-index: 9; font-size: 9.5px; color: rgba(28, 28, 26, .55); text-decoration: none; background: rgba(243, 240, 232, .5); padding: 1px 5px; border-radius: 4px; }
+@media (max-width: 520px) { #credit { bottom: auto; top: calc(max(14px, env(safe-area-inset-top)) + 34px); left: 12px; } }

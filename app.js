@@ -1,5 +1,7 @@
 import * as THREE from 'three';
 import { RoomEnvironment } from './vendor/RoomEnvironment.js';
+import CTX from './context.js';
+import { buildCity, facadeTexture } from './city.js';
 
 /* ------------------------------------------------------------------ *
  *  Apartment Δ303 — the floor plan is the model.
@@ -61,7 +63,10 @@ scene.environmentIntensity = 0.8;
 
 scene.add(new THREE.HemisphereLight('#f1f4f7', '#ddd3c4', 1.45));
 const sun = new THREE.DirectionalLight('#ffe6c7', 2.7);
-sun.position.copy(C).add(new THREE.Vector3(-11, 13, 9));
+{
+  const el = 32 * Math.PI / 180;
+  sun.position.copy(C).add(new THREE.Vector3(CTX.sun[0] * Math.cos(el), Math.sin(el), CTX.sun[1] * Math.cos(el)).multiplyScalar(24));
+}
 sun.target.position.copy(C);
 sun.castShadow = true;
 sun.shadow.mapSize.set(coarse ? 1024 : 2048, coarse ? 1024 : 2048);
@@ -148,9 +153,10 @@ const M = {
   ceil: mat({ color: '#f8f6f2', roughness: 1 }, { paper: false }),
   glow: new THREE.MeshBasicMaterial({ color: '#fff4dc', clippingPlanes: CLIP, toneMapped: false }),
   site: mat({ color: '#e7e3dc', roughness: 0.95 }),
+  facade: mat({ map: facadeTexture(), color: '#f1ece3', roughness: 0.92 }),
   city: new THREE.MeshStandardMaterial({ roughness: 1 }),
   tree: new THREE.MeshStandardMaterial({ roughness: 0.9, flatShading: true }),
-  ground: new THREE.MeshStandardMaterial({ color: '#8f9480', roughness: 1, transparent: true, opacity: 0 }),
+  ground: new THREE.MeshStandardMaterial({ color: '#c9bea6', roughness: 1, transparent: true, opacity: 0 }),
 };
 M.screen.emissive = new THREE.Color('#0a1420'); // not paper: a TV reads dark even on the drawing
 const inkMat = new THREE.LineBasicMaterial({ color: INK, transparent: true, clippingPlanes: CLIP });
@@ -383,11 +389,19 @@ function buildShell() {
   // stop the walker at the front door (the landing is not part of the flat)
   block(W_OUT + 0.05, Z(1225), W_OUT + 1, Z(1335));
 
-  // the building this flat sits in: slab, floors below, landing, neighbour
-  box(G.site, 0, 0, W_OUT, Z_VER, -0.3, -0.001, M.site, { cast: false });
-  box(G.site, 0.05, 0.05, W_OUT - 0.05, Z_SOUTH - 0.05, -10.65, -0.3, M.site, { cast: false });
-  for (const y of [-3.55, -7.1]) box(G.site, 0, Z_SOUTH, W_OUT, Z_VER, y - 0.3, y, M.site, { cast: false });
-  box(G.site, W_OUT, Z(1205), W_OUT + 2.4, Z(1340), -0.3, -0.001, M.site, { cast: false });
+  // the building this flat sits in (its real 23.08 x 15.47 m footprint): slab, floors below,
+  // and on this floor the stair core beside the front door and the neighbour's flat beyond it
+  const BL = CTX.building.len, CORE = W_OUT + 4.4;
+  box(G.site, 0, 0, BL, Z_VER, -0.3, -0.01, M.site, { cast: false });
+  box(G.site, 0.05, 0.05, BL - 0.05, Z_SOUTH - 0.05, -10.65, -0.3, M.facade, { cast: false, tile: 3.3 });
+  for (const y of [-3.55, -7.1]) {
+    box(G.site, 0, Z_SOUTH, BL, Z_VER, y - 0.3, y, M.site, { cast: false });
+    box(G.site, 0.05, Z_VER - 0.1, BL - 0.05, Z_VER - 0.08, y, y + 1, M.glass, { cast: false });
+  }
+  box(G.site, W_OUT, 0, CORE, Z(1205), 0, H + 0.6, M.site, { cast: true });
+  box(G.site, W_OUT, Z(1325), BL, Z_SOUTH, 0, H + 0.35, M.facade, { cast: true, tile: 3.3 });
+  box(G.site, CORE, 0, BL, Z(1325), 0, H + 0.35, M.facade, { cast: true, tile: 3.3 });
+  box(G.site, W_OUT, Z_VER - 0.1, BL - 0.05, Z_VER - 0.08, 0, 1, M.glass, { cast: false });
 
   const ground = new THREE.Mesh(new THREE.PlaneGeometry(700, 700), M.ground);
   ground.rotation.x = -Math.PI / 2;
@@ -629,6 +643,29 @@ function label(name, sub, px, py, scale = 1) {
   G.labels.add(mesh);
   labelMats.push(m);
 }
+function northArrow(px, py) {
+  const cv = document.createElement('canvas');
+  cv.width = cv.height = 256;
+  const g = cv.getContext('2d');
+  g.strokeStyle = g.fillStyle = '#1c1c1a';
+  g.lineWidth = 6;
+  g.beginPath(); g.arc(128, 140, 70, 0, Math.PI * 2); g.stroke();
+  g.beginPath(); g.moveTo(128, 60); g.lineTo(156, 190); g.lineTo(128, 168); g.lineTo(100, 190); g.closePath(); g.fill();
+  g.font = '700 54px "Helvetica Neue", Arial, sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
+  g.fillText('N', 128, 30);
+  const t = new THREE.CanvasTexture(cv);
+  t.colorSpace = THREE.SRGBColorSpace;
+  const m = new THREE.MeshBasicMaterial({ map: t, transparent: true, depthTest: false, depthWrite: false, toneMapped: false, fog: false });
+  const mesh = new THREE.Mesh(new THREE.PlaneGeometry(1.1, 1.1), m);
+  mesh.rotation.x = -Math.PI / 2;
+  mesh.renderOrder = 10;
+  const holder = new THREE.Group();
+  holder.position.set(X(px), 0.05, Z(py));
+  holder.rotation.y = Math.atan2(-CTX.north[0], -CTX.north[1]);
+  holder.add(mesh);
+  G.labels.add(holder);
+  labelMats.push(m);
+}
 function inkLine(points, m = inkMat) {
   const l = new THREE.Line(new THREE.BufferGeometry().setFromPoints(points.map(([x, z]) => new THREE.Vector3(x, 0.012, z))), m);
   G.ink.add(l);
@@ -647,6 +684,7 @@ function buildAnnotations() {
   label('COVERED VERANDA', '9.25 × 2.99', 440, 1915, 0.95);
   label('Δ303', '+10.65', 665, 1262, 0.7);
   label('9.33', '', 437, 585, 0.55);
+  northArrow(480, 1785);
   // overall dimension line, like the sheet
   const zd = Z(610);
   inkLine([[0, zd], [W_OUT, zd]]);
@@ -677,56 +715,24 @@ const caps = (() => {
   return m;
 })();
 
-/* the neighbourhood, so the windows look out on something */
+/* the real street outside (OpenStreetMap), see city.js */
 const G_CTX = new THREE.Group();
 scene.add(G_CTX);
-(() => {
-  let seed = 11;
-  const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
-  const GROUND = -10.65;
-  const bg = new THREE.BoxGeometry(1, 1, 1); bg.translate(0, 0.5, 0);
-  const houses = new THREE.InstancedMesh(bg, M.city, 90);
-  const pal = ['#efe9df', '#e6ded1', '#f4f1ea', '#ddd5c8', '#e9e2d6', '#d8cfc0'];
-  const o = new THREE.Object3D(), col = new THREE.Color();
-  let n = 0;
-  while (n < 90) {
-    const a = rnd() * Math.PI * 2, d = 55 + rnd() * 150;
-    const x = C.x + Math.cos(a) * d, z = C.z + Math.sin(a) * d;
-    const w = 9 + rnd() * 14, dp = 9 + rnd() * 12, h = 8 + rnd() * (d < 90 ? 10 : 22);
-    o.position.set(x, GROUND, z); o.rotation.y = Math.round(rnd() * 4) * Math.PI / 2 + (rnd() - 0.5) * 0.3;
-    o.scale.set(w, h, dp); o.updateMatrix();
-    houses.setMatrixAt(n, o.matrix);
-    houses.setColorAt(n, col.set(pal[n % pal.length]));
-    n++;
-  }
-  houses.receiveShadow = true;
-  G_CTX.add(houses);
-  const tg = new THREE.IcosahedronGeometry(1, 0);
-  const trees = new THREE.InstancedMesh(tg, M.tree, 140);
-  for (let i = 0; i < 140; i++) {
-    const a = rnd() * Math.PI * 2, d = 26 + rnd() * 110, s = 1.8 + rnd() * 2.2;
-    o.position.set(C.x + Math.cos(a) * d, GROUND + s * 1.25, C.z + Math.sin(a) * d);
-    o.rotation.set(rnd(), rnd(), rnd());
-    o.scale.set(s, s * 1.3, s); o.updateMatrix();
-    trees.setMatrixAt(i, o.matrix);
-    trees.setColorAt(i, col.setHSL(0.25 + rnd() * 0.05, 0.22 + rnd() * 0.12, 0.17 + rnd() * 0.08));
-  }
-  G_CTX.add(trees);
-})();
+buildCity(CTX, G_CTX, -10.65);
 
 /* sky dome that follows the camera */
 const skyMat = new THREE.ShaderMaterial({
   uniforms: {
     top: { value: new THREE.Color('#9db8d3') }, horizon: { value: HORIZON.clone() },
-    below: { value: new THREE.Color('#cdc8bc') }, opacity: { value: 0 },
+    below: { value: new THREE.Color('#cdc8bc') }, opacity: { value: 0 }, paper: { value: PAPER.clone() },
   },
   vertexShader: 'varying vec3 vDir; void main(){ vDir = normalize(position); gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
-  fragmentShader: `uniform vec3 top; uniform vec3 horizon; uniform vec3 below; uniform float opacity; varying vec3 vDir;
+  fragmentShader: `uniform vec3 top; uniform vec3 horizon; uniform vec3 below; uniform vec3 paper; uniform float opacity; varying vec3 vDir;
     void main(){ float h = normalize(vDir).y; vec3 c = h > 0.0 ? mix(horizon, top, pow(h, 0.55)) : mix(horizon, below, clamp(-h * 5.0, 0.0, 1.0));
-    gl_FragColor = vec4(c, opacity);
+    gl_FragColor = vec4(mix(paper, c, opacity), 1.0);
     #include <colorspace_fragment>
     }`,
-  side: THREE.BackSide, transparent: true, depthWrite: false, fog: false,
+  side: THREE.BackSide, depthTest: false, depthWrite: false, fog: false,
 });
 const sky = new THREE.Mesh(new THREE.SphereGeometry(1, 32, 16), skyMat);
 sky.frustumCulled = false;
@@ -759,6 +765,7 @@ function setBuild(b) {
   skyMat.uniforms.opacity.value = m;
   M.ground.opacity = m;
   groundMesh.visible = m > 0.005;
+  G.site.visible = b > 0.04;
   G_CTX.visible = m > 0.3;
   ceiling.castShadow = cut.constant > H;
 }
@@ -802,8 +809,8 @@ function k1Pos() { return C.clone().addScaledVector(fwd(0, PITCH_END), -frameDis
 function buildIntroCurve() {
   introCurve = new THREE.CatmullRomCurve3([
     k1Pos(),
-    new THREE.Vector3(W_OUT + 4.6, 5.5, Z(1281) - 1.6),
-    new THREE.Vector3(W_OUT + 2.2, EYE + 0.12, Z(1281)),
+    new THREE.Vector3(W_OUT + 2.2, 10, Z(1281)),
+    new THREE.Vector3(W_OUT + 2.2, 3.2, Z(1281)),
     new THREE.Vector3(W_OUT + 0.7, EYE, Z(1281)),
     ENTRY.clone(),
   ], false, 'centripetal');
