@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { RoomEnvironment } from './vendor/RoomEnvironment.js';
 import CTX from './context.js';
-import { buildCity, facadeTexture } from './city.js';
+import { buildCity, groundTexture, plantCrown } from './city.js';
 
 /* ------------------------------------------------------------------ *
  *  Apartment Δ303 — the floor plan is the model.
@@ -153,10 +153,9 @@ const M = {
   ceil: mat({ color: '#f8f6f2', roughness: 1 }, { paper: false }),
   glow: new THREE.MeshBasicMaterial({ color: '#fff4dc', clippingPlanes: CLIP, toneMapped: false }),
   site: mat({ color: '#e7e3dc', roughness: 0.95 }),
-  facade: mat({ map: facadeTexture(), color: '#f1ece3', roughness: 0.92 }),
   city: new THREE.MeshStandardMaterial({ roughness: 1 }),
   tree: new THREE.MeshStandardMaterial({ roughness: 0.9, flatShading: true }),
-  ground: new THREE.MeshStandardMaterial({ color: '#c9bea6', roughness: 1, transparent: true, opacity: 0 }),
+  ground: new THREE.MeshStandardMaterial({ map: groundTexture(), color: '#e9e2d4', roughness: 1, transparent: true, opacity: 0 }),
 };
 M.screen.emissive = new THREE.Color('#0a1420'); // not paper: a TV reads dark even on the drawing
 const inkMat = new THREE.LineBasicMaterial({ color: INK, transparent: true, clippingPlanes: CLIP });
@@ -393,14 +392,18 @@ function buildShell() {
   // and on this floor the stair core beside the front door and the neighbour's flat beyond it
   const BL = CTX.building.len, CORE = W_OUT + 4.4;
   box(G.site, 0, 0, BL, Z_VER, -0.3, -0.01, M.site, { cast: false });
-  box(G.site, 0.05, 0.05, BL - 0.05, Z_SOUTH - 0.05, -10.65, -0.3, M.facade, { cast: false, tile: 3.3 });
   for (const y of [-3.55, -7.1]) {
     box(G.site, 0, Z_SOUTH, BL, Z_VER, y - 0.3, y, M.site, { cast: false });
     box(G.site, 0.05, Z_VER - 0.1, BL - 0.05, Z_VER - 0.08, y, y + 1, M.glass, { cast: false });
   }
-  box(G.site, W_OUT, 0, CORE, Z(1205), 0, H + 0.6, M.site, { cast: true });
-  box(G.site, W_OUT, Z(1325), BL, Z_SOUTH, 0, H + 0.35, M.facade, { cast: true, tile: 3.3 });
-  box(G.site, CORE, 0, BL, Z(1325), 0, H + 0.35, M.facade, { cast: true, tile: 3.3 });
+  OWN_BUILDING.push(
+    // floors below this one: parking under the building, flats above it, verandas to the street
+    { pts: [[0, 0], [BL, 0], [BL, Z_SOUTH], [0, Z_SOUTH]], y0: -10.65, h: 10.65, floors: 3, style: 'block', front: [2], noBalconies: true, noRoof: true, seed: 303, color: '#f4f1ea' },
+    // on this floor: the stair core beside the front door, and the neighbour's flat
+    { pts: [[W_OUT, 0], [CORE, 0], [CORE, Z(1205)], [W_OUT, Z(1205)]], y0: 0, h: H + 0.6, floors: 1, style: 'core', seed: 304, color: '#f4f1ea' },
+    { pts: [[W_OUT, Z(1325)], [BL, Z(1325)], [BL, Z_SOUTH], [W_OUT, Z_SOUTH]], y0: 0, h: H + 0.35, floors: 1, style: 'block', upperOnly: true, front: [2], noBalconies: true, seed: 305, color: '#f4f1ea' },
+    { pts: [[CORE, 0], [BL, 0], [BL, Z(1325)], [CORE, Z(1325)]], y0: 0, h: H + 0.35, floors: 1, style: 'block', upperOnly: true, front: [0], noBalconies: true, seed: 306, color: '#f4f1ea' },
+  );
   box(G.site, W_OUT, Z_VER - 0.1, BL - 0.05, Z_VER - 0.08, 0, 1, M.glass, { cast: false });
 
   const ground = new THREE.Mesh(new THREE.PlaneGeometry(700, 700), M.ground);
@@ -420,17 +423,15 @@ function buildShell() {
   }
 }
 let ceiling, groundMesh;
+const OWN_BUILDING = [];
 
 /* ---------------- furniture ---------------- */
 function plant(px, py, s = 1) {
   Fc(px, py, 0.17 * s, 0, 0.42 * s, M.pot, { r2: 0.2 * s, block: true });
-  const blobs = [[0, 0.75, 0, 0.32], [0.12, 0.98, 0.05, 0.24], [-0.1, 1.05, -0.06, 0.22], [0.02, 1.25, 0.08, 0.18]];
-  for (const [ox, oy, oz, r] of blobs) {
-    const b = new THREE.Mesh(new THREE.IcosahedronGeometry(r * s, 1), M.leaf);
-    b.position.set(X(px) + ox * s, oy * s, Z(py) + oz * s);
-    b.castShadow = true;
-    G.furniture.add(b);
-  }
+  Fc(px, py, 0.012, 0.42 * s, 0.7 * s, M.pot, { edges: false });
+  const crown = plantCrown(0.36 * s, Math.round(px * 7 + py));
+  crown.position.set(X(px), 0.98 * s, Z(py));
+  G.furniture.add(crown);
 }
 function chair(px, py, face) {
   const cx = X(px), cz = Z(py), s = 0.22;
@@ -718,7 +719,7 @@ const caps = (() => {
 /* the real street outside (OpenStreetMap), see city.js */
 const G_CTX = new THREE.Group();
 scene.add(G_CTX);
-buildCity(CTX, G_CTX, -10.65);
+buildCity(CTX, G_CTX, -10.65, OWN_BUILDING);
 
 /* sky dome that follows the camera */
 const skyMat = new THREE.ShaderMaterial({
@@ -1320,5 +1321,13 @@ window.__fp = {
     ray.setFromCamera(new THREE.Vector2(cx / innerWidth * 2 - 1, -(cy / innerHeight) * 2 + 1), camera);
     return ray.intersectObjects([G.building, G.furniture], true).filter(h => h.object.isMesh).slice(0, 3).map(h => [+h.point.x.toFixed(2), +h.point.y.toFixed(2), +h.point.z.toFixed(2)]);
   },
+  street: (bearing, px = 6.3, pz = 21.5) => {
+    setMode('walk');
+    const a = bearing * D2R, n = CTX.north;
+    const dx = n[0] * Math.cos(a) - n[1] * Math.sin(a), dz = n[0] * Math.sin(a) + n[1] * Math.cos(a);
+    cam.pos.set(px, -10.65 + 1.7, pz); cam.yaw = Math.atan2(-dx, -dz); cam.pitch = 0.08; cam.fov = 70;
+    mode = 'debug';
+  },
+  stats: () => ({ calls: renderer.info.render.calls, tris: renderer.info.render.triangles, geos: renderer.info.memory.geometries, tex: renderer.info.memory.textures }),
   pos: () => ({ x: +cam.pos.x.toFixed(2), z: +cam.pos.z.toFixed(2), yaw: +cam.yaw.toFixed(3), room: roomAt(cam.pos.x, cam.pos.z) }),
 };
