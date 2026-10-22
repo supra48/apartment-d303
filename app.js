@@ -637,20 +637,27 @@ function buildFurniture() {
   Fc(785, 1625, 0.15, 0, 0.02, M.black, { block: true });
   Fc(785, 1625, 0.012, 0.02, 1.48, M.black, { edges: false });
   Fc(785, 1625, 0.2, 1.48, 1.72, M.curtain, { r2: 0.16 });
-  // added storage: built-in cupboards by the front door, floor to ceiling, 2.58 x 0.60 m, oak-toned veneer fronts
-  // (clear of the hall opening at 482 px and of the front door's swing, which starts at 722 px)
-  wardrobeS(492, 1195, 712, 1246, M.veneer);
-  // entrance bench beside it, 1.04 x 0.45 m, ending short of the door swing (1238 px)
-  F(716, 1197, 804, 1235, 0, 0.42, M.veneer, { block: true, tile: 1 });
-  box(G.furniture, X(760) - 0.003, Z(1235), X(760) + 0.003, Z(1235) + 0.006, 0.04, 0.4, M.black, { cast: false });
-  F(718, 1199, 802, 1234, 0.42, 0.5, M.cushion, { tile: 0.6 });
-  // vertical slats on the wall behind the seat
-  for (let x = 717; x < 803; x += 6) F(x, 1195, x + 3, 1198, 0.5, 2.1, M.veneer, { edges: false, cast: false });
+  // added storage + entrance bench, oak-toned veneer. The front door (hinge 807,1323, leaf 85 px) sweeps a
+  // quarter circle, so nothing a person uses sits inside it: the bench is at the hall end, the deep
+  // cupboards stop where their corner clears the arc (765 px), and a shallow coat niche fills the rest.
+  // bench 1.04 x 0.45 m, seat 0.45 m high with the cushion
+  F(492, 1197, 580, 1235, 0, 0.38, M.veneer, { block: true, tile: 1 });
+  box(G.furniture, X(536) - 0.003, Z(1235), X(536) + 0.003, Z(1235) + 0.006, 0.04, 0.36, M.black, { cast: false });
+  F(494, 1199, 578, 1234, 0.38, 0.45, M.cushion, { tile: 0.6 });
+  // vertical slats behind the seat, with a padded back cushion on them
+  for (let x = 493; x < 579; x += 6) F(x, 1195, x + 3, 1198, 0.45, 2.1, M.veneer, { edges: false, cast: false });
+  F(496, 1198, 576, 1204, 0.52, 0.9, M.cushion, { tile: 0.6 });
   // floating shelf, and a cupboard above with an LED strip under it
-  F(716, 1195, 804, 1215, 1.55, 1.58, M.veneer, {});
-  F(712, 1195, 806, 1228, 2.1, H, M.veneer, { tile: 1.2 });
-  F(714, 1197, 804, 1226, 2.088, 2.1, M.glow, { edges: false, cast: false });
-  for (const x of [735, 760, 785]) Fc(x, 1201, 0.012, 1.75, 1.78, M.metal, { edges: false });
+  F(492, 1195, 580, 1215, 1.55, 1.58, M.veneer, {});
+  F(488, 1195, 584, 1228, 2.1, H, M.veneer, { tile: 1.2 });
+  F(490, 1197, 582, 1226, 2.088, 2.1, M.glow, { edges: false, cast: false });
+  // full-depth cupboards, floor to ceiling, 2.12 x 0.60 m
+  wardrobeS(584, 1195, 765, 1246, M.veneer);
+  // coat niche by the door, 0.47 x 0.30 m: adult hooks at 1.75 m, kids' hooks at 1.10 m, cupboard above
+  F(765, 1195, 768, 1221, 0, H, M.veneer, { block: true, edges: true });
+  F(765, 1195, 805, 1221, 0, 0.04, M.veneer, { block: true });
+  F(765, 1195, 805, 1221, 2.1, H, M.veneer, { tile: 1.2 });
+  for (const x of [775, 795]) { Fc(x, 1199, 0.012, 1.74, 1.77, M.metal, { edges: false }); Fc(x, 1199, 0.012, 1.09, 1.12, M.metal, { edges: false }); }
   plant(772, 1365, 0.9);
   plant(462, 1640, 0.8);
 
@@ -727,8 +734,9 @@ function buildAnnotations() {
   label('DINING', '', 265, 1462, 0.85);
   label('LIVING ROOM', '8.67 × 5.54', 705, 1585, 0.95);
   label('COVERED VERANDA', '9.25 × 2.99', 440, 1915, 0.95);
-  label('STORAGE', '2.58 × 0.60', 602, 1221, 0.42);
-  label('BENCH', '', 760, 1216, 0.3);
+  label('STORAGE', '2.12 × 0.60', 674, 1221, 0.42);
+  label('BENCH', '', 536, 1216, 0.3);
+  label('COATS', '', 785, 1208, 0.2);
   label('Δ303', '+10.65', 665, 1290, 0.7);
   label('9.33', '', 437, 585, 0.55);
   northArrow(480, 1785);
@@ -984,8 +992,8 @@ async function goPose(to, ms = 1100) {
 /* ---------------- rooms / viewpoints ---------------- */
 const VIEWS = [
   { name: 'Entrance', p: [745, 1281], t: [150, 1560] },
-  { name: 'Entrance storage', p: [700, 1640], t: [600, 1240] },
-  { name: 'Entrance bench', p: [752, 1316], t: [758, 1200], ty: 0.75 },
+  { name: 'Entrance storage', p: [700, 1640], t: [640, 1240] },
+  { name: 'Entrance bench', p: [560, 1335], t: [536, 1200], ty: 0.75 },
   { name: 'Living room', p: [455, 1470], t: [805, 1495] },
   { name: 'Dining', p: [740, 1630], t: [230, 1470] },
   { name: 'Kitchen', p: [405, 1300], t: [150, 1228] },
