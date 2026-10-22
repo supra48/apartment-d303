@@ -157,6 +157,9 @@ const M = {
   tree: new THREE.MeshStandardMaterial({ roughness: 0.9, flatShading: true }),
   ground: new THREE.MeshStandardMaterial({ map: groundTexture(), color: '#e9e2d4', roughness: 1, transparent: true, opacity: 0 }),
 };
+// warm oak-toned veneer for the entrance joinery (the walnut texture, tinted)
+M.veneer = mat({ map: M.walnut.map, normalMap: M.walnut.normalMap, color: '#ecc79c', roughness: 0.5, side: THREE.DoubleSide, shadowSide: THREE.BackSide });
+M.cushion = mat({ normalMap: LINEN, color: '#3f5f86', roughness: 1, side: THREE.DoubleSide, shadowSide: THREE.BackSide });
 M.screen.emissive = new THREE.Color('#0a1420'); // not paper: a TV reads dark even on the drawing
 const inkMat = new THREE.LineBasicMaterial({ color: INK, transparent: true, clippingPlanes: CLIP });
 const inkFaint = new THREE.LineBasicMaterial({ color: INK, transparent: true, opacity: 0.35 });
@@ -634,10 +637,20 @@ function buildFurniture() {
   Fc(785, 1625, 0.15, 0, 0.02, M.black, { block: true });
   Fc(785, 1625, 0.012, 0.02, 1.48, M.black, { edges: false });
   Fc(785, 1625, 0.2, 1.48, 1.72, M.curtain, { r2: 0.16 });
-  // added storage: built-in cupboards by the front door, floor to ceiling, 2.58 x 0.60 m
+  // added storage: built-in cupboards by the front door, floor to ceiling, 2.58 x 0.60 m, oak-toned veneer fronts
   // (clear of the hall opening at 482 px and of the front door's swing, which starts at 722 px)
-  wardrobeS(492, 1195, 712, 1246, M.lacquer);
-  F(730, 1196, 790, 1199, 1.3, 1.8, M.art2, {});
+  wardrobeS(492, 1195, 712, 1246, M.veneer);
+  // entrance bench beside it, 1.04 x 0.45 m, ending short of the door swing (1238 px)
+  F(716, 1197, 804, 1235, 0, 0.42, M.veneer, { block: true, tile: 1 });
+  box(G.furniture, X(760) - 0.003, Z(1235), X(760) + 0.003, Z(1235) + 0.006, 0.04, 0.4, M.black, { cast: false });
+  F(718, 1199, 802, 1234, 0.42, 0.5, M.cushion, { tile: 0.6 });
+  // vertical slats on the wall behind the seat
+  for (let x = 717; x < 803; x += 6) F(x, 1195, x + 3, 1198, 0.5, 2.1, M.veneer, { edges: false, cast: false });
+  // floating shelf, and a cupboard above with an LED strip under it
+  F(716, 1195, 804, 1215, 1.55, 1.58, M.veneer, {});
+  F(712, 1195, 806, 1228, 2.1, H, M.veneer, { tile: 1.2 });
+  F(714, 1197, 804, 1226, 2.088, 2.1, M.glow, { edges: false, cast: false });
+  for (const x of [735, 760, 785]) Fc(x, 1201, 0.012, 1.75, 1.78, M.metal, { edges: false });
   plant(772, 1365, 0.9);
   plant(462, 1640, 0.8);
 
@@ -715,6 +728,7 @@ function buildAnnotations() {
   label('LIVING ROOM', '8.67 × 5.54', 705, 1585, 0.95);
   label('COVERED VERANDA', '9.25 × 2.99', 440, 1915, 0.95);
   label('STORAGE', '2.58 × 0.60', 602, 1221, 0.42);
+  label('BENCH', '', 760, 1216, 0.3);
   label('Δ303', '+10.65', 665, 1290, 0.7);
   label('9.33', '', 437, 585, 0.55);
   northArrow(480, 1785);
@@ -971,6 +985,7 @@ async function goPose(to, ms = 1100) {
 const VIEWS = [
   { name: 'Entrance', p: [745, 1281], t: [150, 1560] },
   { name: 'Entrance storage', p: [700, 1640], t: [600, 1240] },
+  { name: 'Entrance bench', p: [752, 1316], t: [758, 1200], ty: 0.75 },
   { name: 'Living room', p: [455, 1470], t: [805, 1495] },
   { name: 'Dining', p: [740, 1630], t: [230, 1470] },
   { name: 'Kitchen', p: [405, 1300], t: [150, 1228] },
@@ -986,7 +1001,7 @@ const VIEWS = [
 function viewPose(v) {
   const s = v[layout] || v;
   const pos = new THREE.Vector3(X(s.p[0]), EYE, Z(s.p[1]));
-  const a = lookAngles(pos, new THREE.Vector3(X(s.t[0]), 1.3, Z(s.t[1])));
+  const a = lookAngles(pos, new THREE.Vector3(X(s.t[0]), s.ty ?? 1.3, Z(s.t[1])));
   return { pos, yaw: a.yaw, pitch: a.pitch, fov: walkFov() };
 }
 const ROOMS = [
@@ -994,6 +1009,7 @@ const ROOMS = [
   ['Hallway', 393, 845, 543, 920], ['Hallway', 393, 920, 477, 1196], ['Master bedroom', 487, 668, 807, 1012],
   ['Bedroom 2', 68, 668, 383, 928], ['Bedroom 3', 68, 928, 383, 1190], ['Kitchen', 68, 1190, 420, 1440],
   ['Dining', 68, 1440, 440, 1662], ['Living room', 420, 1190, 807, 1662], ['Covered veranda', 40, 1662, 835, PY_VER],
+  ['Entrance', 807, 1238, 835, 1323],  // standing in the front doorway
 ];
 const V_ROOMS = {
   A: [['En-suite', 685, 1017, 807, 1185], ['Walk-in wardrobe', 487, 1012, 675, 1190]],
