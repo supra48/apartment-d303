@@ -496,6 +496,17 @@ function wardrobeN(x1, y1, x2, y2, m) {
     box(G.furniture, xx - 0.003, fz - 0.004, xx + 0.003, fz + 0.004, 0.05, 2.37, M.black, { cast: false });
   }
 }
+function wardrobeS(x1, y1, x2, y2, m) {
+  // doors on the south face
+  F(x1, y1, x2, y2, 0, H, m, { block: true, tile: 1.2 });
+  const n = Math.max(2, Math.round((x2 - x1) / S / 0.5)), fz = Z(y2) + 0.004;
+  for (let i = 1; i < n; i++) {
+    const xx = lerp(X(x1), X(x2), i / n);
+    box(G.furniture, xx - 0.003, fz - 0.004, xx + 0.003, fz + 0.004, 0.05, H - 0.03, M.black, { cast: false });
+  }
+  // a split at 2.10 m: tall doors below, high cupboards for suitcases above
+  box(G.furniture, X(x1), fz - 0.004, X(x2), fz + 0.004, 2.1, 2.106, M.black, { cast: false });
+}
 function wc(cx, cy, tankSide) {
   // tankSide: where the cistern sits relative to the bowl (n, e)
   const x = X(cx), z = Z(cy);
@@ -623,8 +634,10 @@ function buildFurniture() {
   Fc(785, 1625, 0.15, 0, 0.02, M.black, { block: true });
   Fc(785, 1625, 0.012, 0.02, 1.48, M.black, { edges: false });
   Fc(785, 1625, 0.2, 1.48, 1.72, M.curtain, { r2: 0.16 });
-  F(570, 1196, 660, 1199, 1.25, 1.85, M.art1, {});
-  F(675, 1196, 755, 1199, 1.3, 1.8, M.art2, {});
+  // added storage: built-in cupboards by the front door, floor to ceiling, 2.58 x 0.60 m
+  // (clear of the hall opening at 482 px and of the front door's swing, which starts at 722 px)
+  wardrobeS(492, 1195, 712, 1246, M.lacquer);
+  F(730, 1196, 790, 1199, 1.3, 1.8, M.art2, {});
   plant(772, 1365, 0.9);
   plant(462, 1640, 0.8);
 
@@ -701,7 +714,8 @@ function buildAnnotations() {
   label('DINING', '', 265, 1462, 0.85);
   label('LIVING ROOM', '8.67 × 5.54', 705, 1585, 0.95);
   label('COVERED VERANDA', '9.25 × 2.99', 440, 1915, 0.95);
-  label('Δ303', '+10.65', 665, 1262, 0.7);
+  label('STORAGE', '2.58 × 0.60', 602, 1221, 0.42);
+  label('Δ303', '+10.65', 665, 1290, 0.7);
   label('9.33', '', 437, 585, 0.55);
   northArrow(480, 1785);
   // overall dimension line, like the sheet
@@ -956,6 +970,7 @@ async function goPose(to, ms = 1100) {
 /* ---------------- rooms / viewpoints ---------------- */
 const VIEWS = [
   { name: 'Entrance', p: [745, 1281], t: [150, 1560] },
+  { name: 'Entrance storage', p: [700, 1640], t: [600, 1240] },
   { name: 'Living room', p: [455, 1470], t: [805, 1495] },
   { name: 'Dining', p: [740, 1630], t: [230, 1470] },
   { name: 'Kitchen', p: [405, 1300], t: [150, 1228] },
